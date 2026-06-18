@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Face Recognition – Attendance System</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #f0f4f8;
+    min-height: 100vh;
+  }
+
+  /* ── NAV ── */
+  .nav {
+    background: #0f1f3d;
+    color: white;
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 18px;
+    font-weight: 600;
+  }
+  .nav svg { width: 28px; height: 28px; }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex;
+    gap: 0;
+    background: #fff;
+    border-bottom: 2px solid #e2e8f0;
+    padding: 0 24px;
+  }
+  .tab-btn {
+    padding: 14px 22px;
+    border: none;
+    background: none;
+    font-size: 14px;
+    font-weight: 600;
+    color: #64748b;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s;
+  }
+  .tab-btn.active {
+    color: #1e3a5f;
+    border-bottom-color: #22c55e;
+  }
+
+  /* ── LAYOUT ── */
+  .container { max-width: 900px; margin: 30px auto; padding: 0 16px; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── CARD ── */
+  .card {
+    background: white;
+    border-radius: 12px;
+    padding: 28px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+    margin-bottom: 20px;
+  }
+  .card-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1e3a5f;
+    margin-bottom: 4px;
+  }
+  .card-sub {
+    font-size: 13px;
+    color: #64748b;
+    margin-bottom: 24px;
+  }
+
+  /* ── FORM ── */
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: #1e3a5f;
+    margin-bottom: 6px;
+  }
+  input, select {
+    width: 100%;
+    padding: 11px 14px;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #1e293b;
+    margin-bottom: 18px;
+    outline: none;
+    transition: border 0.2s;
+  }
+  input:focus, select:focus { border-color: #3b82f6; }
+
+  /* ── CAMERA ── */
+  .cam-wrapper {
+    position: relative;
+    background: #e8edf3;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 10px;
+    aspect-ratio: 4/3;
+    max-width: 100%;
+  }
+  #video, #attendVideo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transform: scaleX(-1); /* mirror */
+  }
+  .face-box {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 55%;
+    aspect-ratio: 1;
+    pointer-events: none;
+  }
+  .face-box::before, .face-box::after,
+  .face-box span::before, .face-box span::after {
+    content: '';
+    position: absolute;
+    width: 28px;
+    height: 28px;
+    border-color: #22c55e;
+    border-style: solid;
+  }
+  .face-box::before  { top:0; left:0;  border-width: 3px 0 0 3px; }
+  .face-box::after   { top:0; right:0; border-width: 3px 3px 0 0; }
+  .face-box span::before { bottom:0; left:0;  border-width: 0 0 3px 3px; }
+  .face-box span::after  { bottom:0; right:0; border-width: 0 3px 3px 0; }
+
+  .cam-hint {
+    text-align: center;
+    font-size: 12px;
+    color: #64748b;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+  }
+
+  /* ── BUTTONS ── */
+  .btn {
+    width: 100%;
+    padding: 13px;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: opacity 0.2s, transform 0.1s;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .btn-blue  { background: #2563eb; color: white; }
+  .btn-green { background: #16a34a; color: white; margin-top: 10px; }
+  .btn-outline { background: white; color: #1e3a5f; border: 2px solid #1e3a5f; }
+
+  /* ── ALERTS ── */
+  .alert {
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 16px;
+    display: none;
+  }
+  .alert.show { display: block; }
+  .alert-error   { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+  .alert-success { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+  .alert-info    { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+
+  /* ── SUCCESS SCREEN ── */
+  .success-screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 10px 0;
+  }
+  .success-screen.show { display: flex; }
+  .success-icon {
+    width: 72px; height: 72px;
+    background: #22c55e;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+  }
+  .success-icon svg { width: 38px; height: 38px; color: white; }
+  .success-title { font-size: 24px; font-weight: 700; color: #16a34a; margin-bottom: 6px; }
+  .success-sub { font-size: 14px; color: #64748b; margin-bottom: 20px; }
+
+  .avatar-circle {
+    width: 110px; height: 110px;
+    border-radius: 50%;
+    border: 4px solid #22c55e;
+    object-fit: cover;
+    margin-bottom: 24px;
+  }
+  .avatar-placeholder {
+    width: 110px; height: 110px;
+    border-radius: 50%;
+    border: 4px solid #22c55e;
+    background: #e8edf3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 24px;
+    font-size: 40px;
+    color: #94a3b8;
+  }
+
+  .detail-table {
+    width: 100%;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+    margin-bottom: 20px;
+    text-align: left;
+  }
+  .detail-row {
+    display: flex;
+    align-items: center;
+    padding: 14px 18px;
+    border-bottom: 1px solid #f1f5f9;
+    gap: 14px;
+  }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-icon { color: #94a3b8; font-size: 18px; min-width: 22px; }
+  .detail-label { font-size: 13px; color: #64748b; flex: 1; }
+  .detail-value { font-size: 14px; font-weight: 600; color: #1e293b; }
+
+  /* ── ATTENDANCE TAB ── */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media(max-width: 640px) { .two-col { grid-template-columns: 1fr; } }
+
+  /* ── TABLE ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  th {
+    background: #f8fafc;
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 700;
+    color: #475569;
+    border-bottom: 2px solid #e2e8f0;
+  }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #1e293b;
+  }
+  tr:hover td { background: #f8fafc; }
+
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .badge-green { background: #dcfce7; color: #16a34a; }
+  .badge-blue  { background: #dbeafe; color: #1d4ed8; }
+
+  /* ── SPINNER ── */
+  .spinner {
+    width: 20px; height: 20px;
+    border: 3px solid rgba(255,255,255,0.4);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: none;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<div class="nav">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+    <circle cx="9" cy="7" r="4"/>
+    <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+  </svg>
+  Face Recognition – Attendance System
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('register')">📋 Register</button>
+  <button class="tab-btn" onclick="switchTab('attendance')">✅ Mark Attendance</button>
+  <button class="tab-btn" onclick="switchTab('records')">📊 Records</button>
+</div>
+
+<!-- ════════════════════════════════════════════
+     TAB 1 — REGISTER
+════════════════════════════════════════════ -->
+<div class="container">
+<div id="tab-register" class="tab-content active">
+  <div class="card">
+    <!-- FORM VIEW -->
+    <div id="reg-form-view">
+      <div class="card-title">Employee Registration</div>
+      <div class="card-sub">Enter employee details and capture your face</div>
+
+      <div id="reg-alert" class="alert"></div>
+
+      <label>Employee ID</label>
+      <input id="reg-emp-id" type="text" placeholder="EMP1001" />
+
+      <label>Employee Name</label>
+      <input id="reg-name" type="text" placeholder="Enter full name" />
+
+      <label>Department</label>
+      <select id="reg-dept">
+        <option value="">Select Department</option>
+        <option>Information Technology</option>
+        <option>Human Resources</option>
+        <option>Finance</option>
+        <option>Operations</option>
+        <option>Marketing</option>
+        <option>Sales</option>
+        <option>Administration</option>
+      </select>
+
+      <label>Face Capture</label>
+      <div class="cam-wrapper">
+        <video id="video" autoplay playsinline></video>
+        <div class="face-box"><span></span></div>
+      </div>
+      <div class="cam-hint">ℹ️ Position your face in the frame and look at the camera</div>
+
+      <button class="btn btn-blue" onclick="captureAndRegister()" id="reg-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/>
+        </svg>
+        Capture Face &amp; Register
+        <div class="spinner" id="reg-spinner"></div>
+      </button>
+    </div>
+
+    <!-- SUCCESS VIEW -->
+    <div class="success-screen" id="reg-success-view">
+      <div class="success-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
+      <div class="success-title">Registration Completed</div>
+      <div class="success-sub">Your face has been successfully registered.</div>
+      <img id="reg-avatar" class="avatar-circle" src="" alt="Employee photo" style="display:none"/>
+      <div class="avatar-placeholder" id="reg-avatar-placeholder">👤</div>
+      <div class="detail-table" id="reg-detail-table"></div>
+      <button class="btn btn-green" onclick="resetRegister()">➕ Register Another Employee</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     TAB 2 — MARK ATTENDANCE
+════════════════════════════════════════════ -->
+<div id="tab-attendance" class="tab-content">
+  <div class="two-col">
+    <!-- Camera Card -->
+    <div class="card">
+      <div class="card-title">Mark Attendance</div>
+      <div class="card-sub">Look at the camera to scan your face</div>
+      <div id="attend-alert" class="alert"></div>
+      <div class="cam-wrapper">
+        <video id="attendVideo" autoplay playsinline></video>
+        <div class="face-box"><span></span></div>
+      </div>
+      <div class="cam-hint">ℹ️ Position your face clearly in the frame</div>
+      <button class="btn btn-blue" onclick="scanAndAttend()" id="attend-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/>
+        </svg>
+        Scan Face
+        <div class="spinner" id="attend-spinner"></div>
+      </button>
+    </div>
+
+    <!-- Result Card -->
+    <div class="card">
+      <div class="card-title">Recognition Result</div>
+      <div class="card-sub">Employee details will appear here</div>
+      <div id="attend-result">
+        <div style="text-align:center;color:#94a3b8;padding:40px 0;font-size:14px;">
+          👤<br/><br/>Scan your face to see details
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     TAB 3 — RECORDS
+════════════════════════════════════════════ -->
+<div id="tab-records" class="tab-content">
+  <div class="card">
+    <div class="card-title">Attendance Records</div>
+    <div class="card-sub">All marked attendance entries</div>
+    <div style="overflow-x:auto">
+      <table id="records-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Employee ID</th>
+            <th>Name</th>
+            <th>Department</th>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="records-body">
+          <tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:30px">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</div><!-- /container -->
+
+<!-- HIDDEN CANVAS for capture -->
+<canvas id="snapCanvas" style="display:none"></canvas>
+
+<script>
+const API = "http://localhost:5000/api";
+let regStream = null;
+let attendStream = null;
+
+// ── Tab switching ──────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b,i)=> b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c=> c.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  event.currentTarget.classList.add('active');
+
+  if (tab === 'register')   startCamera('video',       stream=> regStream=stream);
+  if (tab === 'attendance') startCamera('attendVideo',  stream=> attendStream=stream);
+  if (tab === 'records')    loadRecords();
+}
+
+// ── Camera ────────────────────────────────────────────────
+async function startCamera(videoId, cb) {
+  const vid = document.getElementById(videoId);
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { width:640, height:480, facingMode:'user' } });
+    vid.srcObject = stream;
+    if (cb) cb(stream);
+  } catch(e) {
+    alert("Camera access denied. Please allow camera permission.");
+  }
+}
+
+function captureFrame(videoId) {
+  const vid = document.getElementById(videoId);
+  const canvas = document.getElementById('snapCanvas');
+  canvas.width  = vid.videoWidth  || 640;
+  canvas.height = vid.videoHeight || 480;
+  const ctx = canvas.getContext('2d');
+  ctx.translate(canvas.width, 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(vid, 0, 0);
+  return canvas.toDataURL('image/jpeg', 0.9);
+}
+
+// ── Register ──────────────────────────────────────────────
+async function captureAndRegister() {
+  const empId = document.getElementById('reg-emp-id').value.trim();
+  const name  = document.getElementById('reg-name').value.trim();
+  const dept  = document.getElementById('reg-dept').value;
+
+  clearAlert('reg-alert');
+  if (!empId || !name || !dept) {
+    showAlert('reg-alert', 'error', 'Please fill all fields before capturing.');
+    return;
+  }
+
+  setLoading('reg-btn', 'reg-spinner', true);
+  const image = captureFrame('video');
+
+  try {
+    const res = await fetch(API+'/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image, employee_id: empId, name, department: dept })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showRegistrationSuccess(data.employee, image);
+    } else {
+      showAlert('reg-alert', 'error', data.error || 'Registration failed.');
+    }
+  } catch(e) {
+    showAlert('reg-alert', 'error', 'Cannot connect to server. Make sure app.py is running on port 5000.');
+  }
+  setLoading('reg-btn', 'reg-spinner', false);
+}
+
+function showRegistrationSuccess(emp, imageData) {
+  document.getElementById('reg-form-view').style.display = 'none';
+  const sv = document.getElementById('reg-success-view');
+  sv.classList.add('show');
+
+  // Avatar
+  const img = document.getElementById('reg-avatar');
+  const ph  = document.getElementById('reg-avatar-placeholder');
+  if (imageData) { img.src = imageData; img.style.display='block'; ph.style.display='none'; }
+
+  // Detail table
+  document.getElementById('reg-detail-table').innerHTML = `
+    ${detailRow('🪪','Employee ID', emp.employee_id)}
+    ${detailRow('👤','Employee Name', emp.name)}
+    ${detailRow('🏢','Department', emp.department)}
+    ${detailRow('📅','Registration Date & Time', emp.registered_at)}
+  `;
+}
+
+function resetRegister() {
+  document.getElementById('reg-form-view').style.display = 'block';
+  document.getElementById('reg-success-view').classList.remove('show');
+  document.getElementById('reg-emp-id').value = '';
+  document.getElementById('reg-name').value = '';
+  document.getElementById('reg-dept').value = '';
+}
+
+// ── Attendance ────────────────────────────────────────────
+async function scanAndAttend() {
+  clearAlert('attend-alert');
+  setLoading('attend-btn', 'attend-spinner', true);
+  const image = captureFrame('attendVideo');
+
+  try {
+    // Step 1: Recognize
+    const recRes = await fetch(API+'/recognize', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ image })
+    });
+    const recData = await recRes.json();
+
+    if (recData.error) {
+      showAlert('attend-alert','error', recData.error);
+      document.getElementById('attend-result').innerHTML = unknownResult();
+      setLoading('attend-btn','attend-spinner',false);
+      return;
+    }
+
+    if (!recData.known) {
+      showAlert('attend-alert','info','Face not recognized. Please register first.');
+      document.getElementById('attend-result').innerHTML = unknownResult('Not Registered');
+      setLoading('attend-btn','attend-spinner',false);
+      return;
+    }
+
+    // Step 2: Mark attendance
+    const emp = recData.employee;
+    const attRes = await fetch(API+'/attendance', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ employee_id: emp.employee_id })
+    });
+    const attData = await attRes.json();
+
+    if (attData.already_marked) {
+      showAlert('attend-alert','info', `${emp.name} – Attendance already marked today!`);
+      document.getElementById('attend-result').innerHTML = attendResult(emp, null, true, image);
+    } else if (attData.success) {
+      showAlert('attend-alert','success', `✅ Attendance marked for ${emp.name}!`);
+      document.getElementById('attend-result').innerHTML = attendResult(emp, attData.record, false, image);
+    }
+  } catch(e) {
+    showAlert('attend-alert','error','Cannot connect to server. Make sure app.py is running.');
+  }
+  setLoading('attend-btn','attend-spinner',false);
+}
+
+function attendResult(emp, record, alreadyMarked, imageData) {
+  const time = record ? record.datetime_display : 'Already Marked';
+  const badge = alreadyMarked
+    ? `<span class="badge badge-blue">Already Marked</span>`
+    : `<span class="badge badge-green">✔ Present</span>`;
+  return `
+    <div style="text-align:center;margin-bottom:16px">
+      <img src="${imageData}" style="width:90px;height:90px;border-radius:50%;border:3px solid #22c55e;object-fit:cover;"/>
+    </div>
+    <div class="detail-table">
+      ${detailRow('🪪','Employee ID', emp.employee_id)}
+      ${detailRow('👤','Name', emp.name)}
+      ${detailRow('🏢','Department', emp.department)}
+      ${detailRow('📅','Time', time)}
+      ${detailRow('🟢','Status', badge)}
+    </div>
+  `;
+}
+
+function unknownResult(msg='No face detected') {
+  return `<div style="text-align:center;color:#94a3b8;padding:30px;font-size:14px">❌<br/><br/>${msg}</div>`;
+}
+
+// ── Records ───────────────────────────────────────────────
+async function loadRecords() {
+  try {
+    const res  = await fetch(API+'/attendance/list');
+    const data = await res.json();
+    const tbody = document.getElementById('records-body');
+    if (!data.records.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:30px">No attendance records yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.records.slice().reverse().map((r,i)=>`
+      <tr>
+        <td>${i+1}</td>
+        <td>${r.employee_id}</td>
+        <td>${r.name}</td>
+        <td>${r.department}</td>
+        <td>${r.date}</td>
+        <td>${r.time}</td>
+        <td><span class="badge badge-green">Present</span></td>
+      </tr>
+    `).join('');
+  } catch(e) {
+    document.getElementById('records-body').innerHTML =
+      '<tr><td colspan="7" style="text-align:center;color:#b91c1c;padding:30px">Server offline. Start app.py first.</td></tr>';
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────
+function detailRow(icon, label, value) {
+  return `<div class="detail-row">
+    <span class="detail-icon">${icon}</span>
+    <span class="detail-label">${label}</span>
+    <span class="detail-value">${value}</span>
+  </div>`;
+}
+
+function showAlert(id, type, msg) {
+  const el = document.getElementById(id);
+  el.className = `alert alert-${type} show`;
+  el.textContent = msg;
+}
+function clearAlert(id) {
+  const el = document.getElementById(id);
+  el.className = 'alert';
+  el.textContent = '';
+}
+function setLoading(btnId, spinnerId, loading) {
+  document.getElementById(btnId).disabled = loading;
+  document.getElementById(spinnerId).style.display = loading ? 'inline-block' : 'none';
+}
+
+// ── Init ──────────────────────────────────────────────────
+window.onload = () => startCamera('video', stream => regStream = stream);
+</script>
+</body>
+</html>

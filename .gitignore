@@ -1,0 +1,7 @@
+venv/
+__pycache__/
+*.pyc
+instance/attendance.db
+static/uploads/*
+!static/uploads/.gitkeep
+.flask_session/
